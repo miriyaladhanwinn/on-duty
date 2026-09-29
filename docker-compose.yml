@@ -1,0 +1,52 @@
+version: "3.8"
+
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - GIN_MODE=release
+      - DATABASE_URL=postgres://onduty_user:onduty_password@postgres:5432/onduty_db?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - onduty-net
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: onduty_user
+      POSTGRES_PASSWORD: onduty_password
+      POSTGRES_DB: onduty_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/migrations/00001_init_schema.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U onduty_user -d onduty_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - onduty-net
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - onduty-net
+
+volumes:
+  pgdata:
+
+networks:
+  onduty-net:
+    driver: bridge
